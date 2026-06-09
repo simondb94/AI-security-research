@@ -1,156 +1,226 @@
-# MITRE ATLAS, AI, ML Threat Landscape
+# MITRE ATLAS, Adversarial Threat Landscape for AI Systems
 
-Reference: [MITRE ATLAS](https://atlas.mitre.org/)  
-Last reviewed: March 2026
+Last reviewed: June 2026
 
-MITRE ATLAS, Adversarial Threat Landscape for AI Systems is the AI specific equivalent of ATT&CK. It documents the tactics, techniques and procedures TTPs used by adversaries to attack machine learning systems.
+MITRE ATLAS (Adversarial Threat Landscape for AI Systems) is a knowledge base of adversary tactics, techniques, and case studies for AI and machine learning systems. It is structured analogously to MITRE ATT&CK and is designed to complement it, ATT&CK covers attacks on traditional IT infrastructure, ATLAS covers attacks on AI/ML systems specifically.
 
-If you know ATT&CK, ATLAS is a direct translation into AI, ML threat space. This document maps them together where applicable.
-
----
-
-## Why ATLAS matters for SOC analysts
-
-Traditional ATT&CK covers how attackers compromise systems. ATLAS covers how attackers compromise the **AI models and pipelines** running on those systems.
-
-As organisations deploy AI into production, for threat detection, fraud prevention, content moderation, autonomous decision making, those AI systems become targets in their own right. An adversary who can manipulate your AI based threat detection system doesn't need to evade your detections, they can make your detections wrong.
+This document maps ATLAS tactics and techniques to their SOC relevance, traditional ATT&CK equivalents where applicable, and detection considerations from a practitioner perspective.
 
 ---
 
-## ATLAS Tactic Overview
+## Relationship to MITRE ATT&CK
 
-ATLAS organises adversary behaviour into tactics, the *why* behind an action. Below each tactic is mapped to its ATT&CK equivalent where one exists with notes on what it means in practice.
+ATLAS uses the same conceptual structure as ATT&CK, Tactics (the adversary's goal) and Techniques (the method used to achieve it). Many ATLAS techniques are novel to AI systems. Others are traditional techniques applied to AI-specific targets.
+
+Understanding both frameworks together is essential for 2026 SOC operations. AI systems are increasingly integrated into enterprise infrastructure, which means:
+
+* Traditional ATT&CK techniques are used to compromise the systems that host AI components
+* ATLAS techniques are used to attack the AI components themselves
+* A complete attack chain often uses both
 
 ---
+
+## ATLAS Tactics
 
 ### AML.TA0001, Reconnaissance
-**ATT&CK equivalent:** Reconnaissance TA0043
 
-The adversary gathers information about the target AI system before attacking it. Unlike traditional recon, AI recon often involves **probing the model's behaviour** to infer its architecture, training data or decision boundaries.
+**Objective:** Gather information about the target AI system to inform attack planning.
 
-**Techniques include:**
-- **AML.T0000, Active Scanning:** Querying the model with structured inputs to map its behaviour and identify exploitable patterns
-- **AML.T0001, Published Model Documentation:** Reviewing public papers, model cards or GitHub repos to understand the model's architecture and training approach
-- **AML.T0002, Published Training Data:** Identifying the datasets a model was trained on, enabling more targeted poisoning or extraction attacks
+**Key techniques:**
+* **AML.T0000, ML Model Access:** Gaining access to the target model through APIs, open-source repositories, or physical access to the system
+* **AML.T0001, Discover ML Model Ontology:** Identifying the model's input/output structure, task type, and capabilities
+* **AML.T0002, Discover ML Model Family:** Determining the underlying model architecture or base model (e.g., identifying that a product is built on GPT-4 or a specific open-source model)
 
-**SOC note:** Unusual high volume query patterns against an AI API, especially systematic, structured probing that doesn't resemble normal user behaviour, is a recon indicator. Treat it like port scanning.
+**ATT&CK equivalent:** TA0043 Reconnaissance
+
+**SOC relevance:** 
+High-volume, structurally varied API calls are a reconnaissance indicator. Attackers probe model capabilities before mounting extraction or evasion attacks. Behavioural baselining of API usage patterns is the primary detective control.
 
 ---
 
 ### AML.TA0002, Resource Development
-**ATT&CK equivalent:** Resource Development TA0042
 
-The adversary acquires or develops the tools and infrastructure needed to attack the AI system, crafting adversarial examples, building surrogate models or obtaining training data.
+**Objective:** Establish resources required to conduct AI-targeted attacks.
 
-**Techniques include:**
-- **AML.T0017, Develop Capabilities:** Building tools specifically designed to attack AI systems, adversarial example generators, model inversion tools
-- **AML.T0019, Obtain Capabilities:** Acquiring existing attack tools from public research or underground markets
+**Key techniques:**
+* **AML.T0005, Create Proxy ML Model:** Building a surrogate model trained on outputs from the target model, a foundation for transfer attacks
+* **AML.T0017, Acquire ML Attack Capabilities:** Obtaining existing adversarial attack toolkits
 
-**SOC note:** This phase is largely invisible from a defender's perspective, it happens off your network. Awareness matters more than detection here.
+**ATT&CK equivalent:** TA0042 Resource Development
 
----
-
-### AML.TA0004, Initial Access
-**ATT&CK equivalent:** Initial Access TA0001
-
-How the adversary first gains the ability to interact with or influence the target AI system.
-
-**Techniques include:**
-- **AML.T0010, ML Supply Chain Compromise:** Inserting malicious code or poisoned data into the ML pipeline via a third party dependency, pre trained model, or dataset
-- **AML.T0012, Valid Accounts:** Using legitimate credentials to access the ML platform, training infrastructure or model API
-- **AML.T0049, Exploit Public Facing Application:** Exploiting vulnerabilities in the interface that exposes the AI model to users
-
-**SOC note:** Supply chain compromise is the highest risk initial access vector for AI systems, a poisoned pre trained model is invisible until it misbehaves. Treat model downloads and dataset imports with the same scrutiny as installing third party software.
+**SOC relevance:** 
+Limited direct visibility from most SOC positions. The value is awareness, understanding that attackers who subsequently mount evasion or extraction attacks have likely done this groundwork.
 
 ---
 
-### AML.TA0005, Execution
-**ATT&CK equivalent:** Execution TA0002
+### AML.TA0003, Initial Access
 
-The adversary causes their malicious code, payload or instruction to run within the AI system or its pipeline.
+**Objective:** Gain initial access to the target ML system or its supporting infrastructure.
 
-**Techniques include:**
-- **AML.T0011, User Execution:** A user or automated system runs a poisoned model, script or dataset introduced by the adversary
-- **AML.T0047, LLM Prompt Injection:** The adversary's instructions are executed by the LLM as part of its normal inference process, the model itself becomes the execution environment
+**Key techniques:**
+* **AML.T0010, ML Supply Chain Compromise:** Compromising ML models, datasets, or frameworks before they reach the target organisation, via poisoned pre-trained models, malicious libraries, or compromised model repositories
+* **AML.T0012, Valid Accounts:** Using legitimate credentials to access ML platforms, model APIs, or training infrastructure
 
-**SOC note:** Prompt injection OWASP LLM01 lives here in ATLAS terms. The LLM executing attacker instructions is functionally equivalent to a user executing a malicious binary, the mechanism is different but the outcome is the same.
+**ATT&CK equivalent:** TA0001 Initial Access
 
----
-
-### AML.TA0006, Persistence
-**ATT&CK equivalent:** Persistence TA0003
-
-The adversary maintains ongoing access or influence over the AI system, even across model updates or retraining cycles.
-
-**Techniques include:**
-- **AML.T0020, Poison Training Data:** Introducing malicious examples into the training dataset such that every subsequent model trained on that data carries the adversary's backdoor
-- **AML.T0018, Backdoor ML Model:** Embedding a hidden trigger in the model weights, the model behaves normally until a specific input activates the backdoor
-
-**SOC note:** Backdoored models are the AI equivalent of a rootkit, persistent, hard to detect and potentially surviving full system reinstallation, retraining. Standard AV, EDR will not detect a compromised model. Model behaviour testing after every training cycle is the equivalent of running integrity checks.
+**SOC relevance:** 
+Supply chain compromise is the hardest initial access vector to detect. The artefact (model, library, dataset) appears legitimate and passes standard checks. Integrity verification, provenance tracking, and SBOM practices are the primary preventive controls. For Valid Accounts, standard identity monitoring applies, with additional attention to service accounts associated with AI workloads.
 
 ---
 
-### AML.TA0009, Collection
-**ATT&CK equivalent:** Collection TA0009
+### AML.TA0004, Execution
 
-The adversary extracts valuable information from the AI system, training data, model weights, proprietary logic or user data processed by the model.
+**Objective:** Execute adversary-controlled code or commands within the AI/ML environment.
 
-**Techniques include:**
-- **AML.T0035, ML Model Inference API Access:** Using repeated queries to extract information about the model's decision boundaries or training data
-- **AML.T0037, Data from Information Repositories:** Accessing data stores used to train or augment the model
-- **AML.T0040, Extract ML Model:** Reconstructing a functional copy of a proprietary model through systematic querying, known as **model extraction** or **model stealing**
+**Key techniques:**
+* **AML.T0011, User Execution:** Tricking a user into running malicious model-related code, malicious Jupyter notebooks, poisoned model loading scripts
+* **AML.T0034, Backdoor ML Model:** Embedding a hidden behaviour in the model that activates under specific conditions
 
-**SOC note:** Model extraction attacks look like high volume, systematically varied API queries. A stolen model bypasses all future security controls applied to the original, the adversary now has their own unconstrained copy. Alert on query volume anomalies and diversity anomalies, unusually varied inputs from a single source.
+**ATT&CK equivalent:** TA0002 Execution
 
----
-
-### AML.TA0010, Exfiltration
-**ATT&CK equivalent:** Exfiltration TA0010
-
-The adversary removes data or model artefacts from the target environment.
-
-**Techniques include:**
-- **AML.T0024, Exfiltration via ML Inference API:** Using the model's own outputs as a covert channel to leak data, the model is prompted to encode sensitive information into its responses in a way the attacker can decode
-- **AML.T0025, Exfiltrate via Cyber Means:** Standard data exfiltration of model weights, training data or pipeline artefacts once access is obtained
-
-**SOC note:** Covert exfiltration via model outputs is a novel channel that traditional DLP tools are not designed to detect. Monitoring output entropy, volume and structural patterns over time is the current best approach.
+**SOC relevance:** 
+Backdoored models are particularly challenging, the malicious behaviour is in the model weights, not in separate code. Detection requires monitoring for trigger-response patterns in model behaviour, not just infrastructure-level execution events.
 
 ---
 
-### AML.TA0040, ML Attack Staging
-*No direct ATT&CK equivalent, AI specific*
+### AML.TA0005, Persistence
 
-Preparation activities specific to ML attacks that don't map neatly to traditional staging.
+**Objective:** Maintain access to the AI/ML system across restarts, updates, or defensive actions.
 
-**Techniques include:**
-- **AML.T0043, Craft Adversarial Data:** Generating inputs specifically designed to cause the model to misclassify, misbehave or reveal information
-- **AML.T0044, Obtain Attack Model:** Acquiring a surrogate model, a copy or approximation of the target, to develop and test attacks offline before deploying them against the real system
+**Key techniques:**
+* **AML.T0020, Poison Training Data:** Injecting malicious examples into training data so that subsequent model retraining re-embeds the attacker's influence
+* **AML.T0018, Backdoor ML Model (via training):** A persistent backdoor that survives model updates because it is embedded at the training data level
 
----
+**ATT&CK equivalent:** TA0003 Persistence
 
-## ATLAS vs ATT&CK, Key differences
-
-| Dimension | ATT&CK | ATLAS |
-|-----------|--------|-------|
-| Target | Systems, networks, endpoints | AI, ML models and pipelines |
-| Execution environment | OS, applications | Model inference, training pipeline |
-| Persistence mechanism | Registry keys, scheduled tasks, rootkits | Poisoned training data, backdoored model weights |
-| Detection tooling | SIEM, EDR, network monitoring | Model monitoring, data provenance, output analysis |
-| Primary data source | Incident reports, threat intel | Academic research, red team exercises |
-| Maturity | Very mature, 20+ years | Early stage, launched 2021, actively expanding |
+**SOC relevance:** 
+Training data poisoning is a persistence mechanism, even if a compromised model is retrained, the poisoned training data re-introduces the vulnerability. Data provenance and integrity controls on training datasets are the relevant detective controls.
 
 ---
 
-## The key insight for SOC analysts
+### AML.TA0006, Defence Evasion
 
-ATT&CK assumes the attacker wants to **compromise the infrastructure** the AI runs on.
+**Objective:** Avoid detection by AI-specific security controls.
 
-ATLAS assumes the attacker wants to **compromise the AI itself** , making it malfunction, misbehave or work for them rather than for you.
+**Key techniques:**
+* **AML.T0015, Evade ML Model:** Crafting inputs specifically designed to evade an ML-based detection or classification system, adversarial examples that fool the model while appearing normal to humans
+* **AML.T0016, Craft Adversarial Data:** Systematic generation of inputs that cause the target model to produce attacker-desired outputs
 
-As AI systems become integrated into security operations, AI assisted triage, AI driven SOAR, autonomous detection, an adversary who can manipulate the AI has effectively compromised your SOC without ever touching your endpoints.
+**ATT&CK equivalent:** TA0005 Defence Evasion
 
-This is why understanding ATLAS is not optional for Detection and Response engineers. It is the threat model for the tools you will increasingly be defending with and defending against.
+**SOC relevance:** 
+ML-based security controls (malware classifiers, anomaly detection, threat scoring) are subject to adversarial evasion. Attackers who understand that a SOC uses ML-based detection may specifically craft attacks to exploit model blind spots. Defence-in-depth, not relying solely on ML-based detection for any critical control, is the relevant principle.
 
 ---
 
-*These notes are a working reference, not a comprehensive academic treatment. See [atlas.mitre.org](https://atlas.mitre.org) for the full framework, case studies and technique detail.*
+### AML.TA0007, Discovery
+
+**Objective:** Learn about the target AI system's capabilities, limitations, and environment.
+
+**Key techniques:**
+* **AML.T0013, Discover ML Model Capabilities:** Probing the model to understand what it can and cannot do, useful for planning targeted attacks
+* **AML.T0035, ML Model Inference API Access:** Systematic API probing to characterise the model's behaviour
+
+**ATT&CK equivalent:** TA0007 Discovery
+
+**SOC relevance:** 
+Anomalous API call patterns, high volume, structurally varied, originating from a single source, are the primary detection signal for this tactic. See Detection-Ideas.md Detection 1.
+
+---
+
+### AML.TA0008, Collection
+
+**Objective:** Collect data from the AI system or its environment.
+
+**Key techniques:**
+* **AML.T0035, ML Model Inference API Access:** Used for collection as well as discovery, high-volume systematic querying to extract model knowledge or training data
+* **AML.T0037, Exfiltrate via Model Inference API:** Using the model's own outputs as an exfiltration channel, querying the model to surface training data or sensitive information it has access to
+
+**ATT&CK equivalent:** TA0009 Collection
+
+**SOC relevance:** 
+Model extraction and training data reconstruction attacks use this tactic. The attack surface is the inference API itself. Rate limiting, query logging, and velocity anomaly detection are the relevant controls.
+
+---
+
+### AML.TA0009, Exfiltration
+
+**Objective:** Steal data from the AI system or its connected data stores.
+
+**Key techniques:**
+* **AML.T0025, Exfiltrate via Cyber Means:** Using the AI system as an intermediary for data exfiltration, manipulating an agent to transfer data to an attacker-controlled endpoint
+* **AML.T0037, Exfiltrate via Model Inference API:** Querying the model to surface information from its training data or context
+
+**ATT&CK equivalent:** TA0010 Exfiltration
+
+**SOC relevance:** 
+Exfiltration via agent actions is the most operationally significant vector in 2026. A compromised agent exfiltrates using its own legitimate credentials and channels, bypassing DLP controls designed for human-generated transfers. Agent action logging with content inspection is the relevant detective control.
+
+---
+
+### AML.TA0040, Impact
+
+**Objective:** Manipulate, disrupt, or destroy AI system capabilities or the data it depends on.
+
+**Key techniques:**
+* **AML.T0031, Erode ML Model Integrity:** Degrading the model's accuracy or reliability through adversarial inputs, data poisoning, or denial-of-service attacks
+* **AML.T0029, Denial of ML Service:** Overwhelming the ML system with requests to degrade availability, analogous to DoS against traditional services
+
+**ATT&CK equivalent:** TA0040 Impact
+
+**SOC relevance:** 
+For SOC teams using ML-based detection, model integrity attacks are directly operational, an attack that degrades the SOC's own detection model could suppress alerts across an entire class of threats.
+
+---
+
+## ATLAS case studies, selected examples
+
+ATLAS maintains a case study library of real world AI attacks. Notable examples with SOC relevance:
+
+| Case Study | Tactic | Relevance |
+|------------|--------|-----------|
+| Microsoft Tay chatbot manipulation (2016) | Impact, model integrity erosion via adversarial user inputs | Demonstrates that user-generated content can persistently alter model behaviour |
+| GPT-2 training data extraction (2021) | Collection, training data reconstruction via inference API | Shows that LLMs can surface verbatim training data through systematic probing |
+| Indirect prompt injection in LLM agents (2023–2026) | Execution, Exfiltration | Demonstrated across multiple production AI assistant deployments, a mature attack class |
+| Adversarial patches against computer vision (multiple) | Defence Evasion | Physical world adversarial examples that fool ML classifiers, relevant to AI-based physical security |
+
+---
+
+## Mapping ATLAS to detection priorities
+
+| ATLAS Tactic | Primary Detection Approach | Tooling |
+|--------------|---------------------------|---------|
+| Reconnaissance | API call velocity anomaly, structured probing detection | SIEM, API gateway logs |
+| Initial Access (Supply Chain) | Dependency integrity verification, SBOM, model provenance | DevSecOps pipeline controls |
+| Execution (Backdoor) | Trigger-response behaviour monitoring in model outputs | Custom monitoring, red team exercises |
+| Persistence (Training Data Poisoning) | Pre-training data integrity scanning, RAG pre-ingestion scanning | Custom tooling (see Detection 4) |
+| Defence Evasion | Defence-in-depth, multiple overlapping detection methods, do not rely solely on ML classifiers | Architecture |
+| Collection / Exfiltration | Agent action logging, output content inspection, DLP on API responses | SIEM, DLP, agent telemetry |
+| Impact (DoS) | API rate limiting, consumption anomaly detection | API gateway, SIEM |
+
+---
+
+## ATLAS and the 2026 SOC
+
+MITRE ATLAS was published when most AI attacks were research-grade. In 2026, indirect prompt injection, model extraction, and RAG poisoning are operational attack techniques observed in production environments.
+
+The framework provides a shared vocabulary for communicating AI threats to stakeholders who understand ATT&CK, which is its primary practical value for Detection & Response engineers today.
+
+**Forward look:** 
+The AI security community has discussed the need for a successor framework or significant ATLAS expansion that accounts for agentic AI, multi agent pipelines, and NHI-specific attack paths. The current ATLAS framework predates widespread agentic deployment. Engineers who understand both the existing framework and its gaps are well-positioned to contribute to that evolution.
+
+**Real world ATT&CK mapping (June 2026):** 
+Anthropic published an analysis mapping a year's worth of AI-enabled cyber threats onto MITRE ATT&CK, examining 832 accounts banned for malicious cyber activity between March 2025 and March 2026, with some results published via Verizon's 2026 Data Breach Investigations Report (DBIR). This is a useful reference for understanding how AI-enabled attacks map onto the established ATT&CK tactics and techniques that SOC teams already use, and for seeing where existing frameworks hold up versus where they strain. The GTG-1002 campaign (see [AI-Coding-Agent-Security.md](./AI-Coding-Agent-Security.md)) is the highest-profile worked example of AI executing ATT&CK tactics autonomously.
+
+---
+
+## References
+
+* [MITRE ATLAS](https://atlas.mitre.org/)
+* [MITRE ATT&CK](https://attack.mitre.org/)
+* [ATLAS Case Studies](https://atlas.mitre.org/studies/)
+* [ATLAS Techniques](https://atlas.mitre.org/techniques/)
+
+---
+
+*This document reflects MITRE ATLAS as of June 2026. The framework is actively developed, check atlas.mitre.org for the latest techniques and case studies.*

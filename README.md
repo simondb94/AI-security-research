@@ -1,43 +1,62 @@
-# LLM and AI Security Research
+# AI Security Research
 
-Personal research notes on Large Language Model LLM security, AI threat modelling and emerging attack surfaces in agentic AI systems.
+Practitioner research notes on AI security, agentic AI threat modelling, non human identity (NHI) governance, AI coding agent attack surfaces, and detection engineering for emerging AI threats.
 
-Maintained by a SOC Analyst, interested in Detection and Response, actively training into AI security specialisation.
+Maintained by a SOC Analyst actively specialising in Detection & Response for AI systems.
+
+This is not vendor content. Everything here is written from inside a SOC, with detection and response as the primary lens.
 
 ---
 
-## What's in this repository
+## What is in this repository
 
 | File | Description |
 |------|-------------|
-| [OWASP-LLM-Top10.md](./OWASP-LLM-Top10.md) | OWASP Top 10 for LLMs - each vulnerability mapped to real world attack examples, detection angles and SOC relevance |
-| [MITRE-ATLAS-Overview.md](./MITRE-ATLAS-Overview.md) | MITRE ATLAS framework - AI/ML specific ATT&CK tactics and techniques with notes on how they map to traditional TTPs |
-| [Agentic-AI-Threats.md](./Agentic-AI-Threats.md) | Emerging threat landscape for autonomous AI agents - attack vectors, identity risks and prompt injection in agentic pipelines |
-| [Detection-Ideas.md](./Detection-Ideas.md) | Draft KQL and detection logic concepts for AI specific threats in a SOC context |
+| [OWASP-LLM-Top10.md](./OWASP-LLM-Top10.md) | OWASP Top 10 for LLM Applications, each vulnerability mapped to real world attack examples, detection angles and SOC relevance |
+| [OWASP-Agentic-Top10-2026.md](./OWASP-Agentic-Top10-2026.md) | OWASP Top 10 for Agentic Applications 2026, distinct from the LLM Top 10, covering risks specific to autonomous AI systems |
+| [MITRE-ATLAS-Overview.md](./MITRE-ATLAS-Overview.md) | MITRE ATLAS framework, AI/ML-specific ATT&CK tactics and techniques, mapped to traditional TTPs and SOC relevance |
+| [Agentic-AI-Threats.md](./Agentic-AI-Threats.md) | Emerging threat landscape for autonomous AI agents, indirect prompt injection, memory poisoning, MCP vulnerabilities, supply chain attacks, identity risks |
+| [AI-Coding-Agent-Security.md](./AI-Coding-Agent-Security.md) | In the wild RCE techniques against agentic coding tools, TrustFall, SymJack, Semantic Kernel CVEs, and what they mean for defenders |
+| [NHI-Security.md](./NHI-Security.md) | Non Human Identity and agentic identity security, the fastest-growing attack surface in enterprise environments |
+| [Detection-Ideas.md](./Detection-Ideas.md) | KQL and detection logic concepts for AI-specific threats, written for Microsoft Sentinel, adaptable to other SIEMs |
+| [ROADMAP.md](./ROADMAP.md) | Planned research areas and upcoming content |
+| [CHANGELOG.md](./CHANGELOG.md) | Update history |
 
 ---
 
 ## Why this repository exists
 
-AI security is where cybersecurity was in 2013. The threats are real, the attack surface is expanding rapidly and qualified defenders are almost non existent.
+Traditional security frameworks, ATT&CK, CVSS, SIEM rules, were not built for systems that reason, act autonomously, and operate at machine speed. Through the first half of 2026 the gap became operational: agentic AI is now the number-one identified enterprise attack vector, non human identities outnumber human identities by ratios exceeding 100:1, and the first wave of named, in the wild RCE techniques against AI coding agents has arrived.
 
-Traditional security frameworks, ATT&CK, CVSS, SIEM rules, were not built for systems that reason, hallucinate and take autonomous actions. This repository is my working effort to bridge that gap, mapping what I know from SOC operations onto the new threat surfaces that AI systems introduce.
-
-The goal is not to be theoretical. Every note here is written with a detection or response angle in mind also.
+SIEM and EDR tooling built for human behaviour patterns cannot reliably detect an agent doing exactly what it was designed to do, under an attacker's direction. This repository is a working effort to bridge that gap. Every note is written with a detection or response angle in mind. The goal is to be useful to a Detection & Response engineer sitting a shift today.
 
 ---
 
-## Frameworks referenced
+## Frameworks and references
 
-- [OWASP Top 10 for Large Language Model Applications](https://owasp.org/www-project-top-10-for-large-language-model-applications/)
-- [MITRE ATLAS (Adversarial Threat Landscape for AI Systems)](https://atlas.mitre.org/)
-- [NIST AI Risk Management Framework](https://www.nist.gov/system/files/documents/2023/01/26/AI%20RMF%201.0.pdf)
-- [Microsoft AI Red Team](https://learn.microsoft.com/en-us/security/ai-red-team/)
+* [OWASP Top 10 for Large Language Model Applications](https://owasp.org/www-project-top-10-for-large-language-model-applications/)
+* [OWASP Top 10 for Agentic Applications 2026](https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/)
+* [MITRE ATLAS (Adversarial Threat Landscape for AI Systems)](https://atlas.mitre.org/)
+* [NIST AI Risk Management Framework](https://airc.nist.gov/RMF)
+* [Microsoft AI Red Team](https://learn.microsoft.com/en-us/security/ai-red-team/)
+
+---
+
+## Scope
+
+* **LLM security**, prompt injection, model extraction, output manipulation, supply chain
+* **Agentic AI security**, autonomous agent attack vectors, multi agent pipeline threats, memory poisoning
+* **AI coding agent security**, in the wild RCE techniques, MCP trust boundary attacks, framework CVEs
+* **Non Human and agentic identity**, AI agent credentials, ephemeral identity, machine identity detection
+* **Detection engineering**, KQL-based detection logic, logging requirements, SOC integration
 
 ---
 
 ## Status
 
-Active and updated regularly. This is a living document - notes evolve as the threat landscape does.
+Active. Updated regularly as the threat landscape evolves.
 
-> Started: March 2026
+See [CHANGELOG.md](./CHANGELOG.md) for update history and [ROADMAP.md](./ROADMAP.md) for planned additions.
+
+> Repository initiated: March 2026
+> Last reviewed: June 2026

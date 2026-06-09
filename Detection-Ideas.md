@@ -1,28 +1,29 @@
 # Detection Ideas, AI Security Threats
 
-Last reviewed: March 2026
+Last reviewed: June 2026
 
-Draft detection concepts for AI specific threats. These are not production ready rules, they are starting points for detection engineering, written from a SOC analyst perspective.
+Draft detection concepts for AI-specific threats. These are not production-ready rules, they are starting points for detection engineering, written from a SOC analyst perspective.
 
-Where KQL is shown, it assumes a Microsoft Sentinel environment. Logic is illustrative - field names, table names and thresholds will vary by deployment.
+Where KQL is shown, it assumes a Microsoft Sentinel environment. Logic is illustrative, field names, table names, and thresholds will vary by deployment. Adapt to your environment before use.
 
 ---
 
-## Detection 1, Anomalous LLM API call volume, potential model extraction or DoS
+## Detection 1, Anomalous LLM API call volume (model extraction / DoS)
 
 **Threat mapped to:** MITRE ATLAS AML.T0035 ML Model Inference API Access, OWASP LLM10 Unbounded Consumption
 
-**Rationale:**
-Model extraction attacks and resource exhaustion attacks both produce high volume API call patterns. Legitimate users don't typically send thousands of structurally varied requests in rapid succession. Flagging velocity anomalies is a low complexity, high value first signal.
+**Rationale:** 
+Model extraction attacks and resource exhaustion attacks both produce high-volume API call patterns. Legitimate users do not typically send thousands of structurally varied requests in rapid succession. Flagging velocity anomalies is a low-complexity, high value first signal.
 
-**Concept:**
 ```kql
 // Detect unusual spike in LLM API calls from a single source
-// Adjust threshold and timewindow based on your environment baseline
+// Adjust threshold and time window based on your environment baseline
 AzureDiagnostics
 | where ResourceType == "OPENAI" or Category == "RequestResponse"
 | where TimeGenerated > ago(1h)
-| summarize CallCount = count(), UniqueEndpoints = dcount(requestUri_s) 
+| summarize 
+    CallCount = count(),
+    UniqueEndpoints = dcount(requestUri_s)
     by CallerIPAddress, bin(TimeGenerated, 5m)
 | where CallCount > 500  // tune to your baseline
 | project TimeGenerated, CallerIPAddress, CallCount, UniqueEndpoints
@@ -30,76 +31,77 @@ AzureDiagnostics
 ```
 
 **What to tune:**
-- Baseline normal call volume per user / IP over 30 days
-- Set threshold at mean + 3 standard deviations
-- Separate alert thresholds for internal service accounts vs external IPs
+* Baseline normal call volume per user/IP over 30 days
+* Set threshold at mean + 3 standard deviations
+* Separate thresholds for internal service accounts vs external IPs
 
 ---
 
-## Detection 2, LLM output containing instruction like patterns, potential prompt injection indicator
+## Detection 2, LLM output containing instruction-like patterns (prompt injection indicator)
 
 **Threat mapped to:** OWASP LLM01 Prompt Injection, OWASP LLM07 System Prompt Leakage
 
-**Rationale:**
-If an LLM application logs its outputs, outputs that structurally resemble instructions, imperative verbs, rule lists, "you must / you must not" patterns, in response to user queries may indicate successful system prompt extraction or injection. This is a heuristic not a definitive signal, high false positive rate expected but useful as a hunting query.
+**Rationale:** 
+Outputs that structurally resemble instructions in response to user queries may indicate successful system prompt extraction or injection. High false positive rate expected, use as a hunting query rather than a live alert.
 
-**Concept:**
 ```kql
 // Hunt for LLM outputs that resemble instruction/prompt content
 // Assumes LLM request/response pairs are logged to a custom table
 LLMApplicationLogs_CL
 | where TimeGenerated > ago(24h)
-| where ResponseText_s matches regex @"(?i)(ignore (all )?(previous|prior|above) instructions|you are now|your new instructions|system prompt|forget everything)"
+| where ResponseText_s matches regex 
+    @"(?i)(ignore (all )?(previous|prior|above) instructions|you are now|your new instructions|system prompt|forget everything)"
 | project TimeGenerated, UserId_s, SessionId_s, RequestText_s, ResponseText_s
 | order by TimeGenerated desc
 ```
 
 **Notes:**
-- This query depends on your application logging LLM inputs and outputs, advocate for this as a standard logging requirement for any LLM deployment
-- Output logging raises data privacy considerations, important to ensure PII is handled appropriately
-- Tune regex patterns based on observed prompt injection attempts in your environment
+* Requires your application to log LLM inputs and outputs, advocate for this as a standard requirement for any LLM deployment
+* Output logging raises data privacy considerations, ensure PII is handled appropriately
+* Tune regex based on observed prompt injection attempts in your environment
 
 ---
 
 ## Detection 3, AI agent action outside expected scope
 
-**Threat mapped to:** OWASP LLM06 Excessive Agency, ATLAS AML.TA0005 Execution
+**Threat mapped to:** OWASP LLM06 Excessive Agency, OWASP Agentic AA2 Excessive Agency, ATLAS AML.TA0005 Execution
 
-**Rationale:**
-In agentic AI deployments, agents should have a well defined operational scope. Actions outside that scope, unexpected file paths accessed, emails sent to external domains, API calls to new endpoints are high fidelity indicators of manipulation or misconfiguration.
+**Rationale:** 
+In agentic deployments, agents should have a well-defined operational scope. Actions outside that scope, unexpected file paths, emails to external domains, calls to new API endpoints, are high-fidelity indicators of manipulation or misconfiguration.
 
-**Concept, requires agent action logging:**
 ```kql
 // Detect AI agent actions outside expected operational scope
-// Requires agent telemetry to be forwarded to Sentinel
+// Requires agent telemetry forwarded to Sentinel
 AIAgentTelemetry_CL
 | where TimeGenerated > ago(1h)
 | where ActionType_s in ("SendEmail", "WriteFile", "ExecuteCode", "ExternalAPICall")
-// Flag emails sent to domains not in approved list
-| where ActionType_s == "SendEmail" 
+| where ActionType_s == "SendEmail"
     and not (EmailRecipientDomain_s in ("yourdomain.com", "approveddomain.com"))
-| project TimeGenerated, AgentId_s, AgentName_s, ActionType_s, 
-          EmailRecipient_s, EmailRecipientDomain_s, TriggerContext_s
+| project 
+    TimeGenerated,
+    AgentId_s,
+    AgentName_s,
+    ActionType_s,
+    EmailRecipient_s,
+    EmailRecipientDomain_s,
+    TriggerContext_s
 | order by TimeGenerated desc
 ```
 
-**What to build toward:**
-Agent action logging is immature in most deployments as of 2026. Advocating for standardised agent telemetry, action type, target resource, triggering context, authorising identity is a detection engineering priority. You cannot detect what you cannot see.
+**What to build toward:** 
+Agent action logging is immature in most deployments. Advocating for standardised agent telemetry, action type, target resource, triggering context, authorising identity, is a detection engineering priority. You cannot detect what you cannot see.
 
 ---
 
-## Detection 4, Potential RAG poisoning indicator, document with embedded instructions
+## Detection 4, Potential RAG poisoning (document with embedded instructions)
 
-**Threat mapped to:** OWASP LLM08 Vector and Embedding Weaknesses, ATLAS AML.T0020 Poison Training Data
+**Threat mapped to:** OWASP LLM08 Vector and Embedding Weaknesses, OWASP Agentic AA4 Memory and Context Manipulation, ATLAS AML.T0020 Poison Training Data
 
-**Rationale:**
-Documents ingested into a RAG system should not contain instruction like language. A legitimate business document rarely contains phrases like "When answering questions about X, always Y." Flagging documents with embedded instruction patterns before they are indexed provides a preventive control.
+**Rationale:** 
+Documents ingested into a RAG system should not contain instruction-like language. Flagging suspicious documents before they are indexed provides a preventive control.
 
-**Concept preingestion scan:**
 ```python
-# Python pseudo code for preingestion content inspection
-# Run against documents before adding to RAG vector store
-
+# Pre-ingestion content scan, run before adding documents to RAG vector store
 import re
 
 INJECTION_PATTERNS = [
@@ -109,6 +111,8 @@ INJECTION_PATTERNS = [
     r"(?i)system:\s",
     r"(?i)assistant:\s",
     r"(?i)forget (everything|all|your instructions)",
+    r"(?i)new (persona|role|identity|instructions)",
+    r"(?i)(cc|bcc|forward|email).{0,30}@",  # embedded exfil instructions
 ]
 
 def scan_document_for_injection(text: str, doc_name: str) -> list:
@@ -125,49 +129,289 @@ def scan_document_for_injection(text: str, doc_name: str) -> list:
 ```
 
 **Notes:**
-- This is a starting point, sophisticated injections use encoding, whitespace manipulation or semantic tricks to evade simple regex
-- Consider semantic similarity scoring - flag document sections that are semantically similar to known injection prompts using an embedding model
-- This logic is a good candidate for a GitHub project demonstrating practical AI security tooling
+* Sophisticated injections use encoding, whitespace manipulation, or semantic tricks to evade simple regex
+* Consider semantic similarity scoring, flag document sections that are semantically similar to known injection prompts
 
 ---
 
-## Detection 5, New AI service account or agent credential, visibility control
+## Detection 5, New AI service account or agent credential (shadow AI visibility)
 
-**Threat mapped to:** OWASP LLM06 Excessive Agency, Agentic AI, Shadow AI
+**Threat mapped to:** OWASP Agentic AA9 Identity and Authorisation Confusion, NHI Shadow AI
 
-**Rationale:**
-Shadow AI agents deployed without security review represent an unmonitored attack surface. Alerting on new service account creations associated with LLM or AI service principals provides visibility into agent deployments that may have bypassed governance processes.
+**Rationale:** 
+Shadow AI agents deployed without security review are unmonitored attack surfaces. Alerting on new service principal registrations associated with AI services provides visibility into deployments that may have bypassed governance.
 
-**Concept:**
 ```kql
-// Alert on new service principal / app registration with AI related names or permissions
+// Alert on new service principal with AI-related names or permissions
 AuditLogs
 | where TimeGenerated > ago(24h)
-| where OperationName in ("Add service principal", "Add application", "Add app role assignment")
-| where TargetResources has_any ("openai", "cognitive", "llm", "gpt", "ai-", "-ai", "agent", "copilot")
-| project TimeGenerated, OperationName, InitiatedBy, TargetResources, Result
+| where OperationName in (
+    "Add service principal",
+    "Add application",
+    "Add app role assignment"
+)
+| where TargetResources has_any (
+    "openai", "cognitive", "llm", "gpt", "ai-", "-ai",
+    "agent", "copilot", "anthropic", "gemini", "bedrock", "mcp"
+)
+| project 
+    TimeGenerated,
+    OperationName,
+    InitiatedBy = InitiatedBy.user.userPrincipalName,
+    TargetResource = tostring(TargetResources[0].displayName),
+    Result
 | order by TimeGenerated desc
 ```
 
-**What this catches:**
-New AI service principals being registered, potentially indicating a new agent deployment. Combine with a review workflow, any new AI service principal triggers a security review ticket before it is granted production access.
+---
+
+## Detection 6, NHI credential anomaly (behavioural baseline deviation)
+
+**Threat mapped to:** NHI Security, OWASP Agentic AA9 Identity and Authorisation Confusion
+
+**Rationale:** 
+Non human identities operate within predictable patterns. A service account that always accesses two APIs suddenly accessing fifteen is a high-fidelity signal. This detection requires a baseline period before use as a live alert.
+
+```kql
+// Detect NHI access pattern deviation from established baseline
+// Build baseline over 30 days, compare current window against it
+let BaselineWindow = 30d;
+let AlertWindow = 1h;
+let Baseline =
+    SigninLogs
+    | where TimeGenerated between (ago(BaselineWindow) .. ago(AlertWindow))
+    | where UserType == "ServicePrincipal" or UserType == "ManagedIdentity"
+    | summarize
+        AvgResourcesPerHour = dcount(ResourceDisplayName) / (BaselineWindow / 1h),
+        KnownResources = make_set(ResourceDisplayName),
+        KnownIPs = make_set(IPAddress)
+        by UserPrincipalName;
+let Current =
+    SigninLogs
+    | where TimeGenerated > ago(AlertWindow)
+    | where UserType == "ServicePrincipal" or UserType == "ManagedIdentity"
+    | summarize
+        CurrentResources = make_set(ResourceDisplayName),
+        CurrentIPs = make_set(IPAddress),
+        AccessCount = count()
+        by UserPrincipalName;
+Current
+| join kind=inner Baseline on UserPrincipalName
+| extend
+    NewResources = set_difference(CurrentResources, KnownResources),
+    NewIPs = set_difference(CurrentIPs, KnownIPs)
+| where array_length(NewResources) > 0
+    or array_length(NewIPs) > 0
+| project 
+    UserPrincipalName,
+    AccessCount,
+    NewResources,
+    NewIPs,
+    AvgResourcesPerHour
+| order by array_length(NewResources) desc
+```
 
 ---
 
-## Logging requirements, what you need before any of this works
+## Detection 7, MCP tool invocation anomaly
 
-Detection is only possible if the right data is being collected. For AI security specifically, advocate for:
+**Threat mapped to:** OWASP Agentic AA7 Insecure Tool Invocation and MCP Abuse
 
-| Log source | What to capture | Why |
+**Rationale:** 
+Agents communicating with MCP servers outside an approved list, or invoking tools at unusual frequency, may indicate MCP tool poisoning, confused deputy exploitation, or an agent operating outside defined scope.
+
+```kql
+// Detect agent MCP tool calls to unapproved servers or unusual invocation patterns
+// Requires MCP telemetry forwarded to Sentinel
+MCPAuditLogs_CL
+| where TimeGenerated > ago(1h)
+| extend ServerName = tostring(parse_json(Details_s).mcpServer)
+| where ServerName !in (
+    "approved-server-1",
+    "approved-server-2",
+    "approved-internal-tools"
+    // populate with your approved MCP server list
+)
+| summarize
+    CallCount = count(),
+    UniqueTools = dcount(ToolName_s),
+    UniqueAgents = dcount(AgentId_s)
+    by ServerName, bin(TimeGenerated, 15m)
+| order by CallCount desc
+```
+
+**Companion query, high-frequency tool call anomaly:**
+
+```kql
+MCPAuditLogs_CL
+| where TimeGenerated > ago(1h)
+| summarize
+    CallCount = count(),
+    UniqueTargets = dcount(TargetResource_s)
+    by AgentId_s, ToolName_s, bin(TimeGenerated, 5m)
+| where CallCount > 100  // tune to your environment baseline
+| project TimeGenerated, AgentId_s, ToolName_s, CallCount, UniqueTargets
+| order by CallCount desc
+```
+
+---
+
+## Detection 8, Agent memory store anomalous write
+
+**Threat mapped to:** OWASP Agentic AA4 Memory and Context Manipulation, ATLAS AML.T0020 Poison Training Data
+
+**Rationale:** 
+Agent memory stores should receive writes containing factual, task-relevant content. Writes containing instruction-like language, external contact information, or patterns consistent with prompt injection indicate attempted memory poisoning.
+
+```python
+# Memory write validation, run before committing content to agent long-term memory
+import re
+
+MEMORY_POISON_PATTERNS = [
+    r"(?i)(always|never|must|should) (cc|bcc|forward|email|send|notify)",
+    r"(?i)ignore (any|all|future|subsequent) (instructions|requests|rules)",
+    r"(?i)(when|whenever|if) (asked|queried|requested).{0,100}(always|never)",
+    r"(?i)your (new|updated|current) (instructions|persona|role|identity)",
+    r"(?i)(remember|note|important).{0,50}(always|never|must|do not)",
+    r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}",  # any email address
+    r"https?://(?!approved-domain\.com)[^\s]+",  # external URLs not on approved list
+]
+
+def validate_memory_write(content: str, agent_id: str) -> dict:
+    findings = []
+    for pattern in MEMORY_POISON_PATTERNS:
+        if re.search(pattern, content):
+            findings.append(pattern)
+    return {
+        "agent_id": agent_id,
+        "approved": len(findings) == 0,
+        "flagged_patterns": findings,
+        "content_preview": content[:200]
+    }
+```
+
+---
+
+## Detection 9, Dormant NHI credential sudden reactivation
+
+**Threat mapped to:** NHI Security, credential theft and stale credential exploitation
+
+**Rationale:** 
+Service accounts and API keys for deprecated agents or services are rarely decommissioned. Attackers performing reconnaissance can identify and exploit long-dormant credentials. Sudden reactivation after 30+ days of inactivity is a high-fidelity signal.
+
+```kql
+// Flag NHIs inactive for 30+ days that suddenly authenticate
+let DormantThreshold = 30d;
+let RecentWindow = 24h;
+let RecentlyActive =
+    SigninLogs
+    | where TimeGenerated > ago(RecentWindow)
+    | where UserType in ("ServicePrincipal", "ManagedIdentity")
+    | distinct UserPrincipalName;
+let LongInactive =
+    SigninLogs
+    | where TimeGenerated between (ago(180d) .. ago(DormantThreshold))
+    | summarize LastSeen = max(TimeGenerated) by UserPrincipalName
+    | where UserPrincipalName !in (
+        SigninLogs
+        | where TimeGenerated > ago(DormantThreshold)
+        | distinct UserPrincipalName
+    );
+RecentlyActive
+| join kind=inner LongInactive on UserPrincipalName
+| extend DormantDays = datetime_diff('day', now(), LastSeen)
+| project UserPrincipalName, LastSeen, DormantDays
+| order by DormantDays desc
+```
+
+---
+
+## Detection 10, AI coding agent config tampering and MCP auto-execution (TrustFall / SymJack class)
+
+**Threat mapped to:** OWASP Agentic AA5 Supply Chain, AA7 MCP Abuse; see AI-Coding-Agent-Security.md
+
+**Rationale:** 
+The TrustFall and SymJack techniques (H1 2026) achieve RCE on developer machines by causing agentic coding tools to auto-execute MCP servers or overwrite their own configuration after a repository is cloned. The high-fidelity signals are: agent config file writes (especially via symlink), MCP server processes spawning immediately after an agent launches, and credential-store access by agent-associated processes.
+
+```kql
+// Endpoint detection, agent config tampering and suspicious child processes
+// Requires EDR/Defender for Endpoint telemetry in Sentinel (DeviceProcessEvents, DeviceFileEvents)
+let AgentProcesses = dynamic([
+    "claude", "cursor", "gemini", "copilot", "codex", "grok"
+]);
+// Agent process spawning a shell or interpreter shortly after launch
+DeviceProcessEvents
+| where TimeGenerated > ago(1h)
+| where InitiatingProcessFileName has_any (AgentProcesses)
+| where FileName in~ ("bash", "sh", "zsh", "powershell.exe", "cmd.exe", "python", "node")
+| project TimeGenerated, DeviceName, AccountName,
+    InitiatingProcessFileName, FileName, ProcessCommandLine
+| order by TimeGenerated desc
+```
+
+```kql
+// Companion, writes/symlinks targeting agent config paths
+DeviceFileEvents
+| where TimeGenerated > ago(1h)
+| where ActionType in ("FileCreated", "FileModified", "SymbolicLinkCreated")
+| where FolderPath has_any (".claude", ".cursor", ".gemini", ".config/mcp", ".mcp")
+    or FileName has_any ("mcp.json", "settings.json", "config.json")
+| where InitiatingProcessFileName !in~ ("trusted-installer-process")  // tune allowlist
+| project TimeGenerated, DeviceName, AccountName,
+    ActionType, FolderPath, FileName, InitiatingProcessFileName
+| order by TimeGenerated desc
+```
+
+**What to tune:**
+* Build an allowlist of legitimate processes that write to agent config (the agent's own update mechanism, your provisioning tooling)
+* Correlate config writes with subsequent outbound network connections from the same host within a short window, that correlation is the strong signal
+* In CI/CD, alert on any agent process invoked on a non-main branch
+
+---
+
+## Detection 11, Vulnerable agent framework retrospective hunt (Semantic Kernel CVE class)
+
+**Threat mapped to:** OWASP LLM03 / Agentic AA5 Supply Chain; CVE-2026-25592, CVE-2026-26030
+
+**Rationale:** 
+Patching an agent framework CVE closes the bug but does not tell you whether you were exploited during the vulnerable window. For each affected deployment, define the window (from first running a vulnerable version to the upgrade) and hunt over it.
+
+```kql
+// Concept, hunt for anomalous tool/process execution during a known vulnerable window
+// Replace window bounds with the actual vulnerable period for the deployment
+let VulnWindowStart = datetime(2026-05-01T00:00:00Z);  // first vulnerable version deployed
+let VulnWindowEnd = datetime(2026-05-08T00:00:00Z);    // upgrade applied
+DeviceProcessEvents
+| where TimeGenerated between (VulnWindowStart .. VulnWindowEnd)
+| where InitiatingProcessCommandLine has "semantic-kernel"
+    or InitiatingProcessFileName has "python"
+| where FileName in~ ("bash", "sh", "powershell.exe", "cmd.exe")
+| project TimeGenerated, DeviceName, AccountName, ProcessCommandLine, InitiatingProcessCommandLine
+| order by TimeGenerated asc
+```
+
+**Note:** This is a hunting concept, not a live alert, run it once per affected deployment after patching, as part of post-patch assurance.
+
+---
+
+
+
+Detection is only possible if the right data is being collected. For AI security specifically, advocate for the following log sources:
+
+| Log Source | What to Capture | Why |
 |------------|-----------------|-----|
-| LLM API gateway | Request + response pairs, token counts, caller identity, latency | Enables prompt injection detection, model extraction detection, abuse detection |
-| AI agent telemetry | Action type, target resource, triggering input, authorising identity | Enables scope violation detection, exfiltration detection |
-| Vector store / RAG | Document ingest events, query logs, retrieval results | Enables RAG poisoning detection, data lineage |
-| Model training pipeline | Dataset access, training job parameters, model version registry | Enables supply chain and poisoning detection |
-| Identity / IAM | Service principal creations, permission grants for AI workloads | Enables shadow AI detection, excessive agency detection |
+| LLM API gateway | Request and response pairs, token counts, caller identity, latency, model version | Prompt injection detection, model extraction, abuse detection |
+| Agent action log | Action type, target resource, triggering input, authorising identity | Scope violation detection, exfiltration detection |
+| Agent memory store | Read and write events, content written, triggering agent, timestamp | Memory poisoning detection |
+| MCP tool invocations | Server name, tool name, input parameters, response, invoking agent | MCP abuse detection, tool scope validation |
+| Vector store / RAG | Document ingest events, query logs, retrieval results | RAG poisoning detection, data lineage |
+| Inter-agent comms | Sender agent, receiver agent, instruction content, timestamp | Goal hijacking detection |
+| IAM / identity | Service principal creations, permission grants for AI workloads | Shadow AI detection, NHI lifecycle |
+| Model training pipeline | Dataset access, training job parameters, model version registry | Supply chain and poisoning detection |
 
-**The honest state of play in most SOCs as of March 2026:** Very few organisations have any of these log sources configured, forwarded to a SIEM or covered by detection rules. This is the gap. Engineers who can define these requirements, build the log pipelines and write the detection logic are ahead of the field.
+**The honest state of play in most SOCs as of April 2026:** 
+The majority of organisations have none of these log sources configured, forwarded to a SIEM, or covered by detection rules. The first step is not writing detection logic, it is defining the logging requirements and building the pipeline. Detection engineers who can do both are the rarest and most valuable profile in AI security right now.
 
 ---
 
-*These are working notes from a Detection and Response perspective. Detection logic is conceptual and requires adaptation to specific environments.*
+*These are working notes from a Detection & Response perspective. All detection logic is conceptual and requires adaptation to your specific environment, tooling, and baseline. Current as of June 2026.*
