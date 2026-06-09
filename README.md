@@ -70,6 +70,16 @@ Released under the [MIT Licence](LICENSE). Reuse, adapt, and fork freely, attrib
 
 ---
 
+## About the author
+
+Written and maintained by Simon D. Boal, SOC Analyst researching Detection and Response for AI systems.
+
+Questions, corrections and challenge are welcome, open an issue or connect directly.
+
+[LinkedIn](https://www.linkedin.com/in/simon-d-boal-b03b8b70) | [GitHub](https://github.com/simondb94)
+
+---
+
 ## Status
 
 Active. Updated regularly as the threat landscape evolves.
