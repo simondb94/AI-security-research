@@ -26,7 +26,7 @@ With an agentic AI, a successful prompt injection can cause the agent to:
 
 The attack surface is no longer the model's output. It is every action the agent is authorised to take.
 
-As of April 2026, SIEM and EDR tools built for human behaviour patterns cannot reliably detect a compromised agent, because an agent operating under attacker control looks identical to an agent doing its job. The detection challenge is not finding anomalous behaviour. It is defining what legitimate agent behaviour looks like in the first place.
+As of June 2026, SIEM and EDR tools built for human behaviour patterns cannot reliably detect a compromised agent, because an agent operating under attacker control looks identical to an agent doing its job. The detection challenge is not finding anomalous behaviour. It is defining what legitimate agent behaviour looks like in the first place.
 
 ---
 
@@ -80,12 +80,13 @@ Monitor writes to agent memory stores. Flag entries containing instruction-like 
 
 Agents authenticate to downstream services, APIs, databases, email systems, using credentials or tokens. These are high value targets.
 
-Current state as of April 2026:
+Current state as of June 2026:
 
-* Non human identities used by agents outnumber human identities at large organisations by ratios exceeding 100:1
-* 97% of NHIs carry excessive privileges beyond what their function requires
+* Non human identities now outnumber human identities at large organisations by large multiples, measured ratios range from tens-to-one to beyond 100:1 depending on environment
+* Industry surveys consistently find the overwhelming majority of NHIs carry privileges beyond what their function requires
 * Most identity governance platforms were not designed to manage ephemeral, autonomous, non human actors
-* The average enterprise holds over 250, 000 NHIs with no formal lifecycle governance
+
+Sourced figures for all of the above are maintained in [NHI-Security.md](./NHI-Security.md).
 
 **Attack scenario:** 
 An attacker compromises the configuration file of a deployed AI agent and extracts its API credentials. The agent had write access to the company's CRM, file storage, and internal ticketing system. The attacker now has the same access with no MFA, no login alert, and no audit trail that resembles a human.
@@ -174,7 +175,7 @@ Agents are often granted broad permissions because scoping them precisely is dif
 
 Agents deployed without security team knowledge or review, by developers moving fast or business units bypassing IT governance.
 
-As of April 2026, most organisations cannot enumerate all AI agents running in their environment. Security teams have no visibility into what those agents can access, what data they process, or what external services they communicate with.
+As of June 2026, most organisations cannot enumerate all AI agents running in their environment. Security teams have no visibility into what those agents can access, what data they process, or what external services they communicate with.
 
 **The threat:** A shadow agent with broad access becomes an attack surface no one is monitoring. It may be compromised, misconfigured, or simply operating entirely outside any security policy, invisible to the SOC.
 

@@ -78,7 +78,7 @@ LLMApplicationLogs_CL
 
 **Status:** Concept
 
-**Threat mapped to:** OWASP LLM06 Excessive Agency, OWASP Agentic AA2 Excessive Agency, ATLAS AML.TA0005 Execution
+**Threat mapped to:** OWASP LLM06 Excessive Agency, OWASP Agentic ASI02 Tool Misuse and Exploitation, ATLAS AML.TA0005 Execution
 
 **Rationale:** In agentic deployments, agents should have a well-defined operational scope. Actions outside that scope, unexpected file paths, emails to external domains, calls to new API endpoints, are high-fidelity indicators of manipulation or misconfiguration.
 
@@ -109,7 +109,7 @@ AIAgentTelemetry_CL
 
 **Status:** Concept
 
-**Threat mapped to:** OWASP LLM08 Vector and Embedding Weaknesses, OWASP Agentic AA4 Memory and Context Manipulation, ATLAS AML.T0020 Poison Training Data
+**Threat mapped to:** OWASP LLM08 Vector and Embedding Weaknesses, OWASP Agentic ASI06 Memory and Context Poisoning, ATLAS AML.T0020 Poison Training Data
 
 **Rationale:** Documents ingested into a RAG system should not contain instruction-like language. Flagging suspicious documents before they are indexed provides a preventive control.
 
@@ -152,7 +152,7 @@ def scan_document_for_injection(text: str, doc_name: str) -> list:
 
 **Status:** Concept
 
-**Threat mapped to:** OWASP Agentic AA9 Identity and Authorisation Confusion, NHI Shadow AI
+**Threat mapped to:** OWASP Agentic ASI03 Identity and Privilege Abuse, NHI Shadow AI
 
 **Rationale:** Shadow AI agents deployed without security review are unmonitored attack surfaces. Alerting on new service principal registrations associated with AI services provides visibility into deployments that may have bypassed governance.
 
@@ -184,7 +184,7 @@ AuditLogs
 
 **Status:** Concept
 
-**Threat mapped to:** NHI Security, OWASP Agentic AA9 Identity and Authorisation Confusion
+**Threat mapped to:** NHI Security, OWASP Agentic ASI03 Identity and Privilege Abuse
 
 **Rationale:** Non human identities operate within predictable patterns. A service account that always accesses two APIs suddenly accessing fifteen is a high-fidelity signal. This detection requires a baseline period before use as a live alert.
 
@@ -233,7 +233,7 @@ Current
 
 **Status:** Concept
 
-**Threat mapped to:** OWASP Agentic AA7 Insecure Tool Invocation and MCP Abuse
+**Threat mapped to:** OWASP Agentic ASI02 Tool Misuse and Exploitation (MCP abuse)
 
 **Rationale:** Agents communicating with MCP servers outside an approved list, or invoking tools at unusual frequency, may indicate MCP tool poisoning, confused deputy exploitation, or an agent operating outside defined scope.
 
@@ -277,7 +277,7 @@ MCPAuditLogs_CL
 
 **Status:** Concept
 
-**Threat mapped to:** OWASP Agentic AA4 Memory and Context Manipulation, ATLAS AML.T0020 Poison Training Data
+**Threat mapped to:** OWASP Agentic ASI06 Memory and Context Poisoning, ATLAS AML.T0020 Poison Training Data
 
 **Rationale:** Agent memory stores should receive writes containing factual, task-relevant content. Writes containing instruction-like language, external contact information, or patterns consistent with prompt injection indicate attempted memory poisoning.
 
@@ -361,7 +361,7 @@ RecentlyActive
 
 **Status:** Concept
 
-**Threat mapped to:** OWASP Agentic AA5 Supply Chain, AA7 MCP Abuse; see AI-Coding-Agent-Security.md
+**Threat mapped to:** OWASP Agentic ASI04 Agentic Supply Chain Vulnerabilities, ASI05 Unexpected Code Execution; see AI-Coding-Agent-Security.md
 
 **Rationale:** The TrustFall and SymJack techniques (H1 2026) achieve RCE on developer machines by causing agentic coding tools to auto-execute MCP servers or overwrite their own configuration after a repository is cloned. The high-fidelity signals are: agent config file writes (especially via symlink), MCP server processes spawning immediately after an agent launches, and credential-store access by agent-associated processes.
 
@@ -406,7 +406,7 @@ DeviceFileEvents
 
 **Status:** Concept
 
-**Threat mapped to:** OWASP LLM03 / Agentic AA5 Supply Chain; CVE-2026-25592, CVE-2026-26030
+**Threat mapped to:** OWASP LLM03 Supply Chain / Agentic ASI04, ASI05; CVE-2026-25592, CVE-2026-26030
 
 **Rationale:** Patching an agent framework CVE closes the bug but does not tell you whether you were exploited during the vulnerable window. For each affected deployment, define the window (from first running a vulnerable version to the upgrade) and hunt over it.
 

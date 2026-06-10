@@ -124,7 +124,7 @@ An LLM is given more permissions, tool access, or autonomy than is required for 
 **This is the foundational risk for agentic AI systems.** The more an agent can do, the more an attacker can cause it to do. Every permission granted to an agent is a potential blast radius expansion.
 
 **SOC relevance:** 
-97% of non human identities carry excessive privileges. This is not an AI-specific problem but AI agents amplify it because they can be remotely directed to use those privileges in ways a static service account cannot.
+Industry surveys consistently find the overwhelming majority of non human identities carry excessive privileges (sourced figures in [NHI-Security.md](./NHI-Security.md)). This is not an AI-specific problem but AI agents amplify it because they can be remotely directed to use those privileges in ways a static service account cannot.
 
 **Mitigation:**
 * Enforce least privilege scoping for every agent at deployment
@@ -191,19 +191,20 @@ Insufficient rate limiting or resource controls allow an attacker to cause exces
 
 | LLM Risk | Agentic Equivalent / Amplification |
 |----------|------------------------------------|
-| LLM01 Prompt Injection | AA1 Prompt Injection in Agentic Contexts, same vector, orders of magnitude higher impact |
-| LLM06 Excessive Agency | AA2 Excessive Agency, same principle, now applies to autonomous systems at scale |
-| LLM08 Vector and Embedding Weaknesses | AA4 Memory and Context Manipulation, extends to persistent agent memory |
-| LLM03 Supply Chain | AA5 Supply Chain Vulnerabilities in Agent Components, expanded to MCP plugins and skill registries |
-| No LLM equivalent | AA3 Insufficient Authorisation Between Agents, new attack surface |
-| No LLM equivalent | AA7 Insecure Tool Invocation and MCP Abuse, new attack surface |
+| LLM01 Prompt Injection | ASI01 Agent Goal Hijack, same vector, the agent's objective itself is captured |
+| LLM06 Excessive Agency | Amplified across ASI02 Tool Misuse and ASI03 Identity and Privilege Abuse |
+| LLM08 Vector and Embedding Weaknesses | ASI06 Memory and Context Poisoning, extends to persistent agent memory |
+| LLM03 Supply Chain | ASI04 Agentic Supply Chain Vulnerabilities, expanded to MCP servers and skill registries |
+| LLM05 Improper Output Handling | ASI05 Unexpected Code Execution, agent-generated code as the payload |
+| No LLM equivalent | ASI07 Insecure Inter-Agent Communication, new attack surface |
+| No LLM equivalent | ASI08 Cascading Agent Failures and ASI10 Rogue Agents, new attack surface |
 
 ---
 
 ## References
 
 * [OWASP Top 10 for LLM Applications](https://owasp.org/www-project-top-10-for-large-language-model-applications/)
-* [OWASP LLM AI Cybersecurity and Governance Checklist](https://owasp.org/www-project-top-10-for-large-language-model-applications/)
+* [OWASP GenAI Security Project](https://genai.owasp.org/)
 * [MITRE ATLAS](https://atlas.mitre.org/)
 
 ---
