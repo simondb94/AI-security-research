@@ -12,13 +12,14 @@ In 2026, NHI security has moved from niche IAM concern to the central axis of en
 
 ## The scale of the problem
 
-* Non human identities now outnumber human identities in enterprise environments by ratios of 100:1, with hyper-automated organisations reaching 500:1
-* 68% of IT security incidents involve machine identities
-* 50% of enterprises have already experienced a breach directly attributable to unmanaged NHIs
-* 97% of NHIs carry excessive privileges beyond what their function requires
-* Only 15% of organisations feel highly confident in their ability to prevent NHI-based attacks
-* 71% of NHIs are not rotated within recommended timeframes
-* The average enterprise now holds over 250, 000 NHIs across cloud environments
+Measured machine-to-human identity ratios vary by source and environment, Rubrik Zero Labs places the enterprise average at 45:1, Entro Labs measured 144:1 in cloud-native environments, and ManageEngine's Identity Security Outlook 2026 found nearly half of surveyed organisations above 100:1, with some sectors reaching 500:1. Figures reported across 2025 and 2026 industry surveys (see Frameworks and further reading) consistently show the same shape:
+
+- A majority of IT security incidents now involve machine identities in some form
+- Roughly half of enterprises report at least one breach directly attributable to an unmanaged NHI
+- The overwhelming majority of NHIs carry privileges beyond what their function requires
+- Only a small minority of organisations report high confidence in preventing NHI-based attacks
+- Most NHIs are not rotated within recommended timeframes
+- Large enterprises now hold hundreds of thousands of NHIs across cloud environments
 
 The identity governance programmes built over the last decade were designed for humans with managers, onboarding processes, and eventual offboarding. Machine identities have none of these properties. They are created under deadline pressure, granted broad permissions for convenience, and then never revisited.
 
@@ -29,11 +30,12 @@ The identity governance programmes built over the last decade were designed for 
 Every AI agent deployment mints new non human identities. A single agentic workflow can create dozens of new credentials in an afternoon, API keys to authenticate to downstream services, OAuth tokens for SaaS integrations, service accounts for cloud resource access.
 
 In most organisations these credentials are:
-* Created once and never rotated
-* Granted excessive permissions because scoping takes time
-* Owned by nobody, no accountable human identity
-* Not inventoried in any CMDB or secrets management system
-* Invisible to the SOC
+
+- Created once and never rotated
+- Granted excessive permissions because scoping takes time
+- Owned by nobody, no accountable human identity
+- Not inventoried in any CMDB or secrets management system
+- Invisible to the SOC
 
 The 2026 NHI Reality Report found that AI service-related secrets in public GitHub repositories surged 81% year-over-year in 2025, reaching 1.27 million exposed incidents. Developers move fast. Security posture degrades silently.
 
@@ -45,8 +47,7 @@ The 2026 NHI Reality Report found that AI service-related secrets in public GitH
 
 Hardcoded credentials remain endemic. Agents are deployed with API keys embedded in configuration files, environment variables, or source code. When those files are committed to a repository, even briefly, the credentials are exposed.
 
-**Attack scenario:** 
-A developer pushes a configuration file containing an AI agent's Azure OpenAI API key to a private GitHub repository. An automated secret scanning tool operated by a threat actor detects it within minutes. The API key provides access to the organisation's LLM deployment, including all conversation history and the ability to make API calls billed to the organisation's account.
+**Attack scenario:** A developer pushes a configuration file containing an AI agent's Azure OpenAI API key to a private GitHub repository. An automated secret scanning tool operated by a threat actor detects it within minutes. The API key provides access to the organisation's LLM deployment, including all conversation history and the ability to make API calls billed to the organisation's account.
 
 ---
 
@@ -54,8 +55,7 @@ A developer pushes a configuration file containing an AI agent's Azure OpenAI AP
 
 AI agents are frequently granted administrative-scope permissions because determining minimum required permissions is time-consuming. A compromised agent credential therefore provides an attacker with a pivot point into systems the agent was never intended to touch.
 
-**Attack scenario:** 
-An AI coding assistant is granted contributor access to all repositories in an Azure DevOps organisation. An attacker who compromises the agent's service principal can enumerate, clone, and modify all codebases, including injecting malicious code into production pipelines, with no MFA challenge and no login alert that resembles human behaviour.
+**Attack scenario:** An AI coding assistant is granted contributor access to all repositories in an Azure DevOps organisation. An attacker who compromises the agent's service principal can enumerate, clone, and modify all codebases, including injecting malicious code into production pipelines, with no MFA challenge and no login alert that resembles human behaviour.
 
 ---
 
@@ -83,87 +83,19 @@ In multi agent architectures, agents pass tokens and context between each other 
 
 ## Detection approaches
 
-### Detection: Anomalous NHI access patterns
+Detection logic for the core NHI patterns is maintained in one place to avoid divergence, see [Detection-Ideas.md](Detection-Ideas.md):
 
-Establish a behavioural baseline for each non human identity and alert on deviation.
+- **Detection 5**, new AI service account or agent credential (shadow AI visibility)
+- **Detection 6**, NHI credential anomaly (behavioural baseline deviation)
+- **Detection 9**, dormant NHI credential sudden reactivation (logic corrected June 2026)
 
-```kql
-// Detect service account activity outside established baseline
-// Requires behavioural baselines, build over 30 days before enabling as alert
-SigninLogs
-| where TimeGenerated > ago(1h)
-| where UserType == "ServicePrincipal" or UserType == "ManagedIdentity"
-| summarize 
-    AccessCount = count(),
-    UniqueResources = dcount(ResourceDisplayName),
-    UniqueLocations = dcount(IPAddress)
-    by UserPrincipalName, bin(TimeGenerated, 15m)
-| where UniqueResources > 10  // tune to baseline
-    or UniqueLocations > 3    // service accounts rarely change IP
-| project TimeGenerated, UserPrincipalName, AccessCount, UniqueResources, UniqueLocations
-| order by UniqueResources desc
-```
-
----
-
-### Detection: New AI agent service principal registration
-
-```kql
-// Alert on new service principal with AI-related naming or permissions
-AuditLogs
-| where TimeGenerated > ago(24h)
-| where OperationName in (
-    "Add service principal",
-    "Add application",
-    "Add app role assignment",
-    "Add delegated permission grant"
-)
-| where TargetResources has_any (
-    "openai", "cognitive", "llm", "gpt", "ai-", "-ai",
-    "agent", "copilot", "anthropic", "gemini", "bedrock"
-)
-| project 
-    TimeGenerated,
-    OperationName,
-    InitiatedBy = InitiatedBy.user.userPrincipalName,
-    TargetResource = tostring(TargetResources[0].displayName),
-    Result
-| order by TimeGenerated desc
-```
-
----
-
-### Detection: Dormant NHI sudden reactivation
-
-```kql
-// Flag service accounts with no activity for 30+ days that suddenly authenticate
-let DormantThreshold = 30d;
-let RecentWindow = 1d;
-let RecentActivity = 
-    SigninLogs
-    | where TimeGenerated > ago(RecentWindow)
-    | where UserType == "ServicePrincipal"
-    | distinct UserPrincipalName;
-let DormantAccounts =
-    SigninLogs
-    | where TimeGenerated between (ago(90d) .. ago(DormantThreshold))
-    | summarize LastSeen = max(TimeGenerated) by UserPrincipalName
-    | where UserPrincipalName !in (
-        SigninLogs
-        | where TimeGenerated > ago(DormantThreshold)
-        | distinct UserPrincipalName
-    );
-RecentActivity
-| join kind=inner DormantAccounts on UserPrincipalName
-| project UserPrincipalName, LastSeen, ReactivatedAt = now()
-| order by LastSeen asc
-```
-
----
+One detection concept is specific to this file:
 
 ### Detection: Secrets exposed in repository commits (hunting query concept)
 
-```kql
+**Status:** Concept
+
+```
 // Hunt for GitHub audit events indicating secret exposure
 // Requires GitHub Advanced Security logs forwarded to Sentinel
 GitHubAuditLogs_CL
@@ -182,7 +114,7 @@ GitHubAuditLogs_CL
 ## NHI governance framework, minimum viable programme
 
 | Control | Description | Priority |
-|---------|-------------|----------|
+|---|---|---|
 | **Inventory** | Enumerate all NHIs, service accounts, API keys, tokens, certificates, AI agent credentials, into a centralised registry | Critical |
 | **Ownership** | Every NHI must have a named human owner accountable for its lifecycle | Critical |
 | **Least privilege** | Each NHI scoped to minimum permissions required for its defined function only | Critical |
@@ -195,11 +127,11 @@ GitHubAuditLogs_CL
 
 ---
 
-## The honest SOC reality, April 2026
+## The honest SOC reality, June 2026
 
 Most SOCs have no visibility into NHIs whatsoever. There is no asset inventory, no behavioural baseline, no rotation schedule, and no decommissioning process. The credentials exist across cloud consoles, configuration files, shared password managers, and developers' local environments.
 
-The detection logic above assumes logging and telemetry that most organisations have not yet implemented. The first step is not detection, it is visibility. You cannot detect what you cannot see.
+The detection logic referenced above assumes logging and telemetry that most organisations have not yet implemented. The first step is not detection, it is visibility. You cannot detect what you cannot see.
 
 For Detection & Response engineers in 2026, the highest-value contribution is not writing a KQL rule. It is defining the logging requirements, building the pipeline, and making the invisible visible.
 
@@ -207,10 +139,12 @@ For Detection & Response engineers in 2026, the highest-value contribution is no
 
 ## Frameworks and further reading
 
-* [OWASP Non-Human Identity Top 10](https://owasp.org/www-project-non-human-identities-top-10/)
-* [Gartner: Identity and Access Management Adapts to AI Agents (Top Cybersecurity Trends 2026)](https://www.gartner.com/en/newsroom/press-releases/2026-02-05-gartner-identifies-the-top-cybersecurity-trends-for-2026)
-* [CSA: State of Non-Human Identity and AI Security 2026](https://cloudsecurityalliance.org/artifacts/state-of-nhi-and-ai-security-survey-report)
-* [CyberArk: Machine Identity Security](https://www.cyberark.com/what-is/machine-identity-security/)
+- [OWASP Non-Human Identity Top 10](https://owasp.org/www-project-non-human-identities-top-10/)
+- [Gartner: Identity and Access Management Adapts to AI Agents (Top Cybersecurity Trends 2026)](https://www.gartner.com/en/newsroom/press-releases/2026-02-05-gartner-identifies-the-top-cybersecurity-trends-for-2026)
+- [CSA: State of Non-Human Identity and AI Security 2026](https://cloudsecurityalliance.org/artifacts/state-of-nhi-and-ai-security-survey-report)
+- [CyberArk: Machine Identity Security](https://www.cyberark.com/what-is/machine-identity-security/)
+- [ManageEngine: Identity Security Outlook 2026](https://www.helpnetsecurity.com/2026/01/07/identity-security-outlook-2026-report/)
+- [The Hacker News: The Non-Human Identity Crisis (Rubrik / Entro figures)](https://thehackernews.com/expert-insights/2026/05/the-non-human-identity-crisis-why-your.html)
 
 ---
 
